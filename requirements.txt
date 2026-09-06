@@ -1,0 +1,5 @@
+sounddevice>=0.4.6
+numpy>=1.22.0
+scipy>=1.9.0
+pyfiglet>=1.0.0
+pystyle>=2.9
