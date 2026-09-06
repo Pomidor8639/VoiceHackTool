@@ -79,6 +79,14 @@
 
 ## Установка и запуск
 
+### Способ 1. Готовый архив (Без установки Python)
+
+1. Перейдите на страницу [Релизов](https://github.com/Pomidor8639/VoiceHackTool/releases/tag/v1.0.0).
+2. Скачайте архив `VoicehackTool-v1.0.0-windows.zip`.
+3. Распакуйте в любую удобную папку и запустите `VoicehackTool.exe`.
+
+### Способ 2. Запуск через Python
+
 1. Клонируйте репозиторий:
 ```bash
 git clone https://github.com/Pomidor8639/VoiceHackTool.git
