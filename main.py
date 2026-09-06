@@ -1,11 +1,11 @@
-import os
+﻿import os
 import sys
 import time
 import msvcrt
 import sounddevice as sd
 
 from dsp import VoiceChangerDSP
-from audio_engine import AudioDeviceManager, VoicehackToolEngine
+from audio_engine import AudioDeviceManager, VoicehackToolEngine, MicrophoneTester
 from config_manager import ConfigManager
 from ui import TerminalUI
 
@@ -20,7 +20,57 @@ def setup_windows_console():
             pass
 
 
+def first_time_setup():
+    TerminalUI.clear_screen()
+    print(TerminalUI.get_banner())
+    print(" " + "=" * 65)
+    print("  \033[93mПЕРВЫЙ ЗАПУСК VOICEHACKTOOL\033[0m")
+    print("  Сохраненные настройки устройств не найдены.")
+    print("  Выполним быструю настройку микрофона и устройств вывода.")
+    print(" " + "=" * 65)
+    print(f"\n  Настройки сохраняются в папку пользователя на этом ПК:")
+    print(f"  \033[96m{ConfigManager.get_file_path()}\033[0m\n")
+    input("  Нажмите [ENTER] для выбора микрофона с проверкой звука... ")
+
+    inputs = AudioDeviceManager.get_clean_input_microphones()
+    virt_cables = AudioDeviceManager.get_clean_virtual_cables()
+    outputs = AudioDeviceManager.get_clean_output_devices()
+
+    in_dev = TerminalUI.select_microphone_dialog_with_test(
+        inputs, None, MicrophoneTester
+    )
+    if in_dev is None and inputs:
+        in_dev = inputs[0]['index']
+
+    out_dev = TerminalUI.select_device_dialog(
+        "ШАГ 2/3: ВЫБОР ВИРТУАЛЬНОГО КАБЕЛЯ ДЛЯ ВЫВОДА В СИСТЕМУ\n  (Например: CABLE Input или Speaker Animaze Virtual Audio)",
+        virt_cables if virt_cables else outputs,
+        None
+    )
+    if out_dev is None:
+        out_dev = AudioDeviceManager.get_default_output_index()
+
+    mon_dev = TerminalUI.select_device_dialog(
+        "ШАГ 3/3: ВЫБОР НАУШНИКОВ ДЛЯ МОНИТОРИНГА\n  (Куда выводить звук при включении прослушивания себя клавишей L)",
+        outputs,
+        None
+    )
+    if mon_dev is None:
+        mon_dev = AudioDeviceManager.get_default_output_index()
+
+    ConfigManager.save_selected_devices(in_dev, out_dev, mon_dev)
+
+    TerminalUI.clear_screen()
+    print(TerminalUI.get_banner())
+    print("  \033[92mНачальная настройка успешно сохранена на ПК!\033[0m")
+    time.sleep(1.0)
+    return in_dev, out_dev, mon_dev
+
+
 def get_initial_devices():
+    if not ConfigManager.has_saved_config():
+        return first_time_setup()
+
     cfg = ConfigManager.load_config()
     saved_in_name = cfg.get("input_device_name")
     saved_in_host = cfg.get("input_hostapi")
@@ -80,9 +130,9 @@ def handle_device_configuration(engine: VoicehackToolEngine):
 
     while True:
         all_devs = sd.query_devices()
-        cur_in_name = all_devs[engine.input_device_id]['name'] if engine.input_device_id is not None else "Не выбран"
-        cur_out_name = all_devs[engine.output_device_id]['name'] if engine.output_device_id is not None else "Не выбран"
-        cur_mon_name = all_devs[engine.monitor_device_id]['name'] if engine.monitor_device_id is not None else "Не выбран"
+        cur_in_name = all_devs[engine.input_device_id]['name'] if engine.input_device_id is not None and engine.input_device_id < len(all_devs) else "Не выбран"
+        cur_out_name = all_devs[engine.output_device_id]['name'] if engine.output_device_id is not None and engine.output_device_id < len(all_devs) else "Не выбран"
+        cur_mon_name = all_devs[engine.monitor_device_id]['name'] if engine.monitor_device_id is not None and engine.monitor_device_id < len(all_devs) else "Не выбран"
 
         choice = TerminalUI.device_menu(cur_in_name, cur_out_name, cur_mon_name)
 
@@ -94,13 +144,13 @@ def handle_device_configuration(engine: VoicehackToolEngine):
         outputs = AudioDeviceManager.get_clean_output_devices()
 
         if choice == '1':
-            new_in = TerminalUI.select_device_dialog(
-                "ВЫБОР ВХОДНОГО МИКРОФОНА", inputs, engine.input_device_id
+            new_in = TerminalUI.select_microphone_dialog_with_test(
+                inputs, engine.input_device_id, MicrophoneTester
             )
             engine.set_devices(new_in, engine.output_device_id, engine.monitor_device_id)
             ConfigManager.save_selected_devices(engine.input_device_id, engine.output_device_id, engine.monitor_device_id)
-            print("\n  \033[92mМикрофон сохранен в config.json\033[0m")
-            time.sleep(1.0)
+            print("\n  \033[92mМикрофон сохранен в настройки на ПК\033[0m")
+            time.sleep(0.8)
 
         elif choice == '2':
             new_out = TerminalUI.select_device_dialog(
@@ -108,8 +158,8 @@ def handle_device_configuration(engine: VoicehackToolEngine):
             )
             engine.set_devices(engine.input_device_id, new_out, engine.monitor_device_id)
             ConfigManager.save_selected_devices(engine.input_device_id, engine.output_device_id, engine.monitor_device_id)
-            print("\n  \033[92mВиртуальный кабель сохранен в config.json\033[0m")
-            time.sleep(1.0)
+            print("\n  \033[92mВиртуальный кабель сохранен в настройки на ПК\033[0m")
+            time.sleep(0.8)
 
         elif choice == '3':
             new_mon = TerminalUI.select_device_dialog(
@@ -117,12 +167,12 @@ def handle_device_configuration(engine: VoicehackToolEngine):
             )
             engine.set_devices(engine.input_device_id, engine.output_device_id, new_mon)
             ConfigManager.save_selected_devices(engine.input_device_id, engine.output_device_id, engine.monitor_device_id)
-            print("\n  \033[92mНаушники мониторинга сохранены в config.json\033[0m")
-            time.sleep(1.0)
+            print("\n  \033[92mНаушники мониторинга сохранены в настройки на ПК\033[0m")
+            time.sleep(0.8)
 
         elif choice == '4':
-            new_in = TerminalUI.select_device_dialog(
-                "ВЫБОР ВХОДНОГО МИКРОФОНА", inputs, engine.input_device_id
+            new_in = TerminalUI.select_microphone_dialog_with_test(
+                inputs, engine.input_device_id, MicrophoneTester
             )
             new_out = TerminalUI.select_device_dialog(
                 "ВЫБОР ВИРТУАЛЬНОГО ВЫХОДА (КАБЕЛЯ)", virt_cables, engine.output_device_id
@@ -132,8 +182,8 @@ def handle_device_configuration(engine: VoicehackToolEngine):
             )
             engine.set_devices(new_in, new_out, new_mon)
             ConfigManager.save_selected_devices(engine.input_device_id, engine.output_device_id, engine.monitor_device_id)
-            print("\n  \033[92mВсе настройки сохранены в config.json\033[0m")
-            time.sleep(1.0)
+            print("\n  \033[92mВсе настройки успешно сохранены на ПК\033[0m")
+            time.sleep(0.8)
             break
 
     TerminalUI.clear_screen()
@@ -191,8 +241,8 @@ def main():
             if now - last_ui_update > 0.08:
                 last_ui_update = now
                 all_devs = sd.query_devices()
-                in_name = all_devs[engine.input_device_id]['name'] if engine.input_device_id < len(all_devs) else "Unknown"
-                out_name = all_devs[engine.output_device_id]['name'] if engine.output_device_id < len(all_devs) else "Unknown"
+                in_name = all_devs[engine.input_device_id]['name'] if engine.input_device_id is not None and engine.input_device_id < len(all_devs) else "Unknown"
+                out_name = all_devs[engine.output_device_id]['name'] if engine.output_device_id is not None and engine.output_device_id < len(all_devs) else "Unknown"
                 virt_name = AudioDeviceManager.find_virtual_microphone_name(out_name)
 
                 TerminalUI.print_main_screen(

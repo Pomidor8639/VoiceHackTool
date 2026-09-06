@@ -371,3 +371,49 @@ class VoicehackToolEngine:
             self._stream = None
 
 VoiceHackEngine = VoicehackToolEngine
+
+
+class MicrophoneTester:
+
+    def __init__(self, device_id: int, sample_rate: int = 44100):
+        self.device_id = device_id
+        self.sample_rate = sample_rate
+        self.level = 0.0
+        self._stream = None
+        self.running = False
+
+    def _callback(self, indata, frames, time_info, status):
+        if indata.ndim > 1 and indata.shape[1] > 1:
+            mono = indata[:, 0].astype(np.float32)
+        else:
+            mono = indata.flatten().astype(np.float32)
+        rms = float(np.sqrt(np.mean(mono ** 2)))
+        self.level = min(1.0, rms * 6.0)
+
+    def start(self) -> bool:
+        try:
+            self._stream = sd.InputStream(
+                device=self.device_id,
+                channels=1,
+                samplerate=self.sample_rate,
+                blocksize=512,
+                dtype='float32',
+                callback=self._callback
+            )
+            self._stream.start()
+            self.running = True
+            return True
+        except Exception:
+            self._stream = None
+            self.running = False
+            return False
+
+    def stop(self):
+        self.running = False
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
