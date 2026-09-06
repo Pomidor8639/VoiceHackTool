@@ -4,11 +4,12 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![Release](https://img.shields.io/github/v/release/Pomidor8639/VoiceHackTool?style=for-the-badge&color=blue)](https://github.com/Pomidor8639/VoiceHackTool/releases)
 [![SoundDevice](https://img.shields.io/badge/SoundDevice-PortAudio-FF6F00?style=for-the-badge)](https://python-sounddevice.readthedocs.io/)
 [![NumPy](https://img.shields.io/badge/NumPy-Fast_DSP-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-**Консольное приложение на Python для изменения голоса в реальном времени с выводом в виртуальный микрофон Windows.**
+**Консольное приложение для изменения голоса в реальном времени с выводом в виртуальный микрофон Windows.**
 
 </div>
 
@@ -65,15 +66,23 @@
 ## Требования
 
 - Windows 10 / 11
-- Python 3.10 или новее
 - Виртуальный аудиодрайвер (один из вариантов):
   - VB-Audio Virtual Cable (бесплатный, рекомендуется)
   - Animaze Virtual Audio Driver
   - Voicemod Virtual Audio
+- Для запуска из исходного кода: Python 3.10+
 
 ---
 
-## Установка
+## Быстрый запуск
+
+### Вариант 1. Готовый исполняемый файл (Без установки Python)
+
+1. Перейдите на страницу [Релизов](https://github.com/Pomidor8639/VoiceHackTool/releases).
+2. Скачайте `VoicehackTool.exe`.
+3. Запустите файл `VoicehackTool.exe`.
+
+### Вариант 2. Запуск через Python
 
 1. Клонируйте репозиторий:
 ```bash
@@ -86,11 +95,7 @@ cd VoiceHackTool
 pip install -r requirements.txt
 ```
 
----
-
-## Запуск
-
-Запустите файл run.bat двойным кликом или выполните в консоли:
+3. Запустите программу:
 ```bash
 python main.py
 ```
@@ -110,12 +115,11 @@ python main.py
 
 ## Структура проекта
 
-- `main.py` — основной цикл приложения, обработка горячих клавиш и рендеринг терминального интерфейса.
+- `main.py` — точка входа, цикл приложения, обработка горячих клавиш и рендеринг терминального интерфейса.
 - `dsp.py` — модуль цифровой обработки сигналов (гранулярный питч-шифтинг, биквадратные эквалайзеры, ламповый овердрайв, шумоподавитель, кроссфейдер).
 - `audio_engine.py` — управление потоками PortAudio через sounddevice, фильтрация системных устройств, мониторинг.
 - `ui.py` — вывод стилизованного баннера и индикаторов уровней сигнала (VU meters).
 - `config_manager.py` — сохранение и загрузка настроек устройств.
-- `run.bat` — скрипт быстрого запуска для Windows.
 
 ---
 

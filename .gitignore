@@ -5,3 +5,6 @@ config.json
 .vscode/
 .idea/
 *.log
+build/
+dist/
+*.spec
