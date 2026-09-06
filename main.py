@@ -212,6 +212,10 @@ def main():
     saved_cfg = ConfigManager.load_config()
     saved_voice = saved_cfg.get("voice_id", 1)
     saved_vol = saved_cfg.get("volume_gain", 2.2)
+    saved_custom = saved_cfg.get("custom_voice_params")
+    if saved_custom and isinstance(saved_custom, dict):
+        engine.dsp.set_custom_params(saved_custom)
+
     engine.dsp.set_voice(saved_voice)
     engine.dsp.volume_gain = float(saved_vol)
 
@@ -221,6 +225,8 @@ def main():
         try:
             engine.sample_rate = 48000
             engine.dsp = VoiceChangerDSP(sample_rate=48000)
+            if saved_custom and isinstance(saved_custom, dict):
+                engine.dsp.set_custom_params(saved_custom)
             engine.dsp.set_voice(saved_voice)
             engine.dsp.volume_gain = float(saved_vol)
             engine.start()
@@ -245,6 +251,13 @@ def main():
                 out_name = all_devs[engine.output_device_id]['name'] if engine.output_device_id is not None and engine.output_device_id < len(all_devs) else "Unknown"
                 virt_name = AudioDeviceManager.find_virtual_microphone_name(out_name)
 
+                custom_desc = ""
+                if engine.dsp.current_voice == 5:
+                    p_val = float(engine.dsp.custom_params.get("pitch_semitones", -5.0))
+                    d_val = int(engine.dsp.custom_params.get("drive", 0.25) * 100)
+                    sign = "+" if p_val > 0 else ""
+                    custom_desc = f"Питч: {sign}{p_val:.1f} st, Дист: {d_val}%"
+
                 TerminalUI.print_main_screen(
                     in_dev_name=in_name,
                     out_dev_name=out_name,
@@ -255,7 +268,8 @@ def main():
                     in_level=engine.input_level,
                     out_level=engine.output_level,
                     voice_name=engine.dsp.VOICES.get(engine.dsp.current_voice, "Аноним"),
-                    volume=engine.dsp.volume_gain
+                    volume=engine.dsp.volume_gain,
+                    custom_desc=custom_desc
                 )
 
             if msvcrt.kbhit():
@@ -265,12 +279,23 @@ def main():
                     break
                 elif key in [b't', b'T', b' ']:
                     engine.toggle_effect()
-                elif key in [b'1', b'2', b'3', b'4']:
+                elif key in [b'1', b'2', b'3', b'4', b'5']:
                     v_id = int(key.decode('ascii'))
                     engine.dsp.set_voice(v_id)
                     cfg = ConfigManager.load_config()
                     cfg["voice_id"] = v_id
                     ConfigManager.save_config(cfg)
+                elif key in [b'c', b'C', '\u0441'.encode('utf-8'), '\u0421'.encode('utf-8')]:
+                    engine.stop()
+                    new_params = TerminalUI.custom_voice_dialog(engine.dsp.custom_params)
+                    engine.dsp.set_custom_params(new_params)
+                    engine.dsp.set_voice(5)
+                    cfg = ConfigManager.load_config()
+                    cfg["custom_voice_params"] = new_params
+                    cfg["voice_id"] = 5
+                    ConfigManager.save_config(cfg)
+                    TerminalUI.clear_screen()
+                    engine.start()
                 elif key in [b'v', b'V', b'e', b'E']:
                     new_v = (engine.dsp.current_voice % len(engine.dsp.VOICES)) + 1
                     engine.dsp.set_voice(new_v)

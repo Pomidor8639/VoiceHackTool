@@ -46,7 +46,7 @@ class TerminalUI:
     def print_main_screen(cls, in_dev_name: str, out_dev_name: str, virt_mic_name: str,
                           effect_active: bool, is_muted: bool, is_monitoring: bool,
                           in_level: float, out_level: float, voice_name: str = "Аноним",
-                          volume: float = 2.0):
+                          volume: float = 2.0, custom_desc: str = ""):
         sys.stdout.write("\033[H")
         sys.stdout.flush()
 
@@ -56,9 +56,13 @@ class TerminalUI:
         status_mute = "\033[91mЗАГЛУШЕН\033[0m" if is_muted else "\033[92mВ ЭФИРЕ\033[0m"
         status_monitor = "\033[92mВКЛЮЧЕН (Слышите себя)\033[0m" if is_monitoring else "\033[90mВЫКЛЮЧЕН\033[0m"
 
+        voice_display = f"\033[95m{voice_name}\033[0m"
+        if custom_desc:
+            voice_display += f" \033[90m({custom_desc})\033[0m"
+
         print(" " + "=" * 65)
         print(f"  ГОЛОСОВОЙ МОДУЛЬ: {status_effect}   СТАТУС: {status_mute}")
-        print(f"  ВЫБРАННЫЙ ГОЛОС:  \033[95m{voice_name}\033[0m")
+        print(f"  ВЫБРАННЫЙ ГОЛОС:  {voice_display}")
         print(f"  ГРОМКОСТЬ:        \033[93m{int(round(volume * 100))}%\033[0m  (Регулировка: + / -)")
         print(f"  МОНИТОРИНГ:       {status_monitor}")
         print(" " + "=" * 65)
@@ -74,7 +78,8 @@ class TerminalUI:
         print(" " + "=" * 65)
 
         print("\033[97m  УПРАВЛЕНИЕ КЛАВИШАМИ:\033[0m")
-        print("   1 / 2 / 3 / 4 / V : Сменить голос (Аноним, Женский, Ребенок, Демон)")
+        print("   1..5 / V          : Сменить голос (1-Аноним, 2-Женский, 3-Ребенок, 4-Демон, 5-Свой)")
+        print("   C                 : Настроить параметры своего голоса (Питч, Дисторшн, Бас)")
         print("   + / -             : Громкость звука (+20% / -20%)")
         print("   T или ПРОБЕЛ      : Переключить эффект (Голос / Исходный)")
         print("   M                 : Заглушить микрофон (Mute)")
@@ -82,6 +87,62 @@ class TerminalUI:
         print("   D                 : Меню аудиоустройств")
         print("   Q                 : Выход из программы")
         print(" " + "=" * 65)
+
+    @classmethod
+    def custom_voice_dialog(cls, params: dict) -> dict:
+        p = dict(params)
+        while True:
+            cls.clear_screen()
+            print(cls.get_banner())
+            print("\033[93mНАСТРОЙКА ПОЛЬЗОВАТЕЛЬСКОГО ГОЛОСА\033[0m")
+            print(" " + "=" * 65)
+            pitch = p.get("pitch_semitones", -5.0)
+            drive = int(p.get("drive", 0.25) * 100)
+            bass = p.get("bass_boost_db", 6.0)
+            robot = int(p.get("robot_mod", 0.0) * 100)
+
+            sign = "+" if pitch > 0 else ""
+            print(f"  1. Сдвиг тона (Питч):        \033[96m{sign}{pitch:.1f} полутонов\033[0m   (диапазон: от -18 до +18)")
+            print(f"  2. Перегруз (Дисторшн):      \033[96m{drive}%\033[0m               (диапазон: от 0% до 100%)")
+            print(f"  3. Усиление баса (Резонанс): \033[96m+{bass:.1f} дБ\033[0m           (диапазон: от 0 до +15 дБ)")
+            print(f"  4. Робо-модуляция (Тремоло): \033[96m{robot}%\033[0m               (диапазон: от 0% до 100%)")
+            print(f"  5. Сбросить к значениям по умолчанию")
+            print(" " + "=" * 65)
+            print("\n  0. Применить и вернуться в главное меню")
+
+            choice = input("\nВыберите параметр для изменения (0-5): ").strip()
+            if choice == '0' or not choice:
+                break
+            elif choice == '1':
+                val = input(f"Введите значение питча в полутонах (текущее {pitch:+.1f}, от -18 до +18): ").strip()
+                try:
+                    p["pitch_semitones"] = max(-18.0, min(18.0, float(val)))
+                except ValueError:
+                    pass
+            elif choice == '2':
+                val = input(f"Введите процент дисторшна (текущий {drive}%, от 0 до 100): ").strip()
+                try:
+                    p["drive"] = max(0.0, min(1.0, float(val) / 100.0))
+                except ValueError:
+                    pass
+            elif choice == '3':
+                val = input(f"Введите усиление баса в дБ (текущее +{bass:.1f}, от 0 до 15): ").strip()
+                try:
+                    p["bass_boost_db"] = max(0.0, min(15.0, float(val)))
+                except ValueError:
+                    pass
+            elif choice == '4':
+                val = input(f"Введите процент робо-модуляции (текущий {robot}%, от 0 до 100): ").strip()
+                try:
+                    p["robot_mod"] = max(0.0, min(1.0, float(val) / 100.0))
+                except ValueError:
+                    pass
+            elif choice == '5':
+                p = {"pitch_semitones": -5.0, "drive": 0.25, "bass_boost_db": 6.0, "robot_mod": 0.0}
+                print("  \033[92mСброшено к стандартным параметрам.\033[0m")
+                time.sleep(0.6)
+
+        return p
 
     @classmethod
     def device_menu(cls, current_in: str, current_out: str, current_mon: str) -> str:

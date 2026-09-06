@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import scipy.signal as signal
 
 
@@ -8,7 +8,8 @@ class VoiceChangerDSP:
         1: "Аноним",
         2: "Женский",
         3: "Ребенок",
-        4: "Демон"
+        4: "Демон",
+        5: "Пользовательский"
     }
 
     def __init__(self, sample_rate: int = 44100):
@@ -29,7 +30,15 @@ class VoiceChangerDSP:
             1: [0.0, 0.0],
             2: [0.0],
             3: [0.0],
-            4: [0.0, 0.0]
+            4: [0.0, 0.0],
+            5: [0.0, 0.0]
+        }
+
+        self.custom_params = {
+            "pitch_semitones": -5.0,
+            "drive": 0.25,
+            "bass_boost_db": 6.0,
+            "robot_mod": 0.0
         }
 
         self.anon_lp_b, self.anon_lp_a = signal.butter(3, 3900.0 / (sample_rate / 2.0), btype='low')
@@ -44,6 +53,8 @@ class VoiceChangerDSP:
         self.child_hp_b, self.child_hp_a = signal.butter(2, 230.0 / (sample_rate / 2.0), btype='high')
         self.child_hp_zi = signal.lfilter_zi(self.child_hp_b, self.child_hp_a)
         self.child_eq_b, self.child_eq_a, self.child_eq_zi = self._biquad_peaking(3600.0, 4.0, 1.2)
+
+        self._update_custom_filters()
 
         self.growl_phase = 0.0
 
@@ -71,6 +82,14 @@ class VoiceChangerDSP:
         a = np.array([1.0, a1 / a0, a2 / a0], dtype=np.float64)
         zi = signal.lfilter_zi(b, a)
         return b, a, zi
+
+    def _update_custom_filters(self):
+        bass_db = float(self.custom_params.get("bass_boost_db", 6.0))
+        self.custom_bass_b, self.custom_bass_a, self.custom_bass_zi = self._biquad_peaking(140.0, max(0.0, min(16.0, bass_db)), 1.1)
+
+    def set_custom_params(self, params: dict):
+        self.custom_params.update(params)
+        self._update_custom_filters()
 
     def set_voice(self, voice_id: int):
         if voice_id in self.VOICES and voice_id != self.current_voice:
@@ -156,6 +175,34 @@ class VoiceChangerDSP:
             x = 0.58 * y1 + 0.55 * y2
             x, self.bass_zi = signal.lfilter(self.bass_b, self.bass_a, x, zi=self.bass_zi)
             x = np.tanh(x * 2.6) + 0.22 * np.tanh(x * 5.5)
+            return x
+
+        elif v_id == 5:
+            pitch = float(self.custom_params.get("pitch_semitones", -5.0))
+            drive = float(self.custom_params.get("drive", 0.25))
+            robot = float(self.custom_params.get("robot_mod", 0.0))
+
+            rate = 2.0 ** (pitch / 12.0)
+            grain_ms = 46.0 if pitch > 0 else (60.0 + min(20.0, abs(pitch) * 1.5))
+            x = self._read_pitch_shifted(num_samples, rate, 0, 5, grain_ms=grain_ms)
+
+            if pitch < -6.0:
+                sub_rate = 2.0 ** ((pitch - 6.0) / 12.0)
+                sub = self._read_pitch_shifted(num_samples, sub_rate, 1, 5, grain_ms=76.0)
+                x = 0.72 * x + 0.38 * sub
+
+            if float(self.custom_params.get("bass_boost_db", 0.0)) > 0.5:
+                x, self.custom_bass_zi = signal.lfilter(self.custom_bass_b, self.custom_bass_a, x, zi=self.custom_bass_zi)
+
+            if robot > 0.02:
+                t = np.arange(num_samples) / self.sample_rate
+                mod = (1.0 - robot * 0.45) + (robot * 0.45) * np.sin(2.0 * np.pi * 40.0 * t)
+                x = x * mod
+
+            if drive > 0.01:
+                mult = 1.0 + drive * 3.5
+                x = np.tanh(x * mult) * (1.0 + drive * 0.35)
+
             return x
 
         return np.zeros(num_samples, dtype=np.float32)
